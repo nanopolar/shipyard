@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Shipyard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏗️</text></svg>">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --surface2: #1c2128; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e;
+      --accent: #238636; --accent-hover: #2ea043;
+      --blue: #388bfd; --blue-dim: rgba(56,139,253,0.12);
+      --danger: #da3633; --danger-hover: #f85149; --danger-dim: rgba(218,54,51,0.12);
+      --success: #3fb950; --success-dim: rgba(63,185,80,0.12);
+      --warn: #d29922; --warn-dim: rgba(210,153,34,0.12);
+      --radius: 8px; --mono: 'SF Mono','Cascadia Code','Fira Code',monospace;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100dvh; display: flex; flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      padding: 14px 20px; display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .brand { font-weight: 700; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+    .logout-btn {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      font-size: 13px; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: all 0.15s;
+    }
+    .logout-btn:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ── Layout ── */
+    main { flex: 1; max-width: 960px; width: 100%; margin: 0 auto; padding: 24px 16px 48px; }
+
+    /* ── Steps ── */
+    .steps { display: flex; align-items: center; margin-bottom: 28px; }
+    .step {
+      display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500;
+      color: var(--muted); flex: 1; justify-content: center;
+    }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .step.active { color: var(--text); }
+    .step.active .step-num { border-color: var(--blue); color: var(--blue); }
+    .step.done .step-num  { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .step-connector { height: 1px; background: var(--border); flex: 1; max-width: 40px; }
+
+    /* ── Cards ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; }
+    .card-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+
+    /* ── Upload ── */
+    .upload-zone {
+      border: 2px dashed var(--border); border-radius: var(--radius); padding: 40px 20px;
+      text-align: center; cursor: pointer; transition: all 0.2s; background: var(--bg); position: relative;
+    }
+    .upload-zone:hover, .upload-zone.drag-over { border-color: var(--blue); background: var(--blue-dim); }
+    .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+    .upload-icon { font-size: 32px; margin-bottom: 10px; }
+    .upload-label { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+    .upload-sub { font-size: 12px; color: var(--muted); }
+    .upload-progress { margin-top: 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; height: 4px; }
+    .upload-progress-bar { height: 100%; background: var(--blue); width: 0%; transition: width 0.2s; }
+    .upload-status { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: center; }
+
+    /* ── Project list ── */
+    .project-list { display: flex; flex-direction: column; gap: 8px; }
+    .project-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); cursor: pointer; transition: border-color 0.15s;
+    }
+    .project-item:hover { border-color: var(--blue); }
+    .project-name { font-size: 14px; font-weight: 500; font-family: var(--mono); }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; }
+    .badge-blue   { background: var(--blue-dim);    color: var(--blue); }
+    .badge-warn   { background: var(--warn-dim);    color: var(--warn); }
+
+    /* ── Status bar ── */
+    .status-bar {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+      padding: 12px 16px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); margin-bottom: 16px;
+    }
+    .status-indicator { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .status-dot.running { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    .status-dot.stopped { background: var(--muted); }
+    .status-actions { display: flex; gap: 8px; }
+
+    /* ── Env editor ── */
+    .env-grid { display: flex; flex-direction: column; gap: 8px; }
+    .env-header { display: grid; grid-template-columns: 1fr 1fr 32px; gap: 8px; margin-bottom: 2px; }
+    .env-header span { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; padding: 0 10px; }
+    .env-row { display: grid; grid-template-columns: 1fr 1fr 32px; gap: 8px; align-items: center; }
+    .env-key-input, .env-val-input {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); font-family: var(--mono); font-size: 12px;
+      padding: 7px 10px; outline: none; transition: border-color 0.15s; width: 100%;
+    }
+    .env-key-input { color: var(--warn); font-weight: 600; }
+    .env-key-input:focus, .env-val-input:focus { border-color: var(--blue); }
+    .env-delete-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted);
+      font-size: 16px; width: 32px; height: 32px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.15s;
+    }
+    .env-delete-btn:hover { border-color: var(--danger); color: var(--danger-hover); }
+    .add-var-btn {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      background: none; border: 1px dashed var(--border); border-radius: 6px;
+      color: var(--muted); font-size: 13px; padding: 8px 14px;
+      cursor: pointer; transition: all 0.15s; width: 100%; margin-top: 4px;
+    }
+    .add-var-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .env-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 12px 0; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 6px;
+      border: none; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary   { background: var(--accent);   color: #fff; }
+    .btn-primary:hover:not(:disabled)  { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover:not(:disabled){ border-color: var(--muted); }
+    .btn-danger    { background: var(--danger-dim); color: var(--danger-hover); border: 1px solid rgba(218,54,51,0.3); }
+    .btn-danger:hover:not(:disabled)   { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn-row { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+    .btn-row .spacer { flex: 1; }
+
+    /* ── Terminal ── */
+    .terminal {
+      background: #010409; border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.6;
+      color: #c9d1d9; white-space: pre-wrap; word-break: break-all;
+      max-height: 520px; overflow-y: auto; min-height: 140px;
+    }
+
+    /* ── Banners ── */
+    .alert {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 500; margin-bottom: 16px;
+    }
+    .alert.success { background: var(--success-dim); border: 1px solid rgba(63,185,80,0.3); color: var(--success); }
+    .alert.failure { background: var(--danger-dim);  border: 1px solid rgba(218,54,51,0.3);  color: var(--danger-hover); }
+    .alert.info    { background: var(--blue-dim);    border: 1px solid rgba(56,139,253,0.3); color: var(--blue); }
+
+    .deploying-row { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 15px; height: 15px; border: 2px solid var(--border); border-top-color: var(--blue);
+      border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    .spinner-sm {
+      width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--muted);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Divider ── */
+    .divider { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; margin: 20px 0; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Confirm modal ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px;
+    }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 28px 24px; max-width: 360px; width: 100%;
+    }
+    .modal h3 { font-size: 16px; margin-bottom: 10px; }
+    .modal p  { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+    .modal .btn-row { margin-top: 0; }
+
+    /* ── Views ── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    @media (max-width: 480px) {
+      .step-label { display: none; }
+      main { padding: 16px 12px 40px; }
+      .card { padding: 18px 14px; }
+      .env-row { grid-template-columns: 1fr 1fr 32px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">🏗️ Shipyard</div>
+  <form method="POST" action="/logout" style="margin:0">
+    <button type="submit" class="logout-btn">Sign out</button>
+  </form>
+</header>
+
+<main>
+  <div class="steps">
+    <div class="step active" data-step="1"><div class="step-num">1</div><span class="step-label">Upload</span></div>
+    <div class="step-connector"></div>
+    <div class="step" data-step="2"><div class="step-num">2</div><span class="step-label">Configure</span></div>
+    <div class="step-connector"></div>
+    <div class="step" data-step="3"><div class="step-num">3</div><span class="step-label">Deploy</span></div>
+  </div>
+
+  <!-- ── View 1: Home ── -->
+  <div class="view active" id="view-upload">
+    <div class="card">
+      <div class="card-title">📦 Upload New Artifact</div>
+      <div class="upload-zone" id="uploadZone">
+        <input type="file" id="fileInput" accept=".zip">
+        <div class="upload-icon">⬆️</div>
+        <div class="upload-label">Tap to select or drop a .zip file</div>
+        <div class="upload-sub">A zip with a folder containing docker-compose.yml</div>
+      </div>
+      <div id="uploadProgressWrap" style="display:none">
+        <div class="upload-progress"><div class="upload-progress-bar" id="uploadBar"></div></div>
+        <div class="upload-status" id="uploadStatus">Uploading…</div>
+      </div>
+    </div>
+
+    <div class="divider">or open an existing project</div>
+
+    <div class="card">
+      <div class="card-title">📁 Projects</div>
+      <div class="project-list" id="projectList">
+        <div class="env-empty" id="projectsEmpty">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View 2: Configure ── -->
+  <div class="view" id="view-env">
+    <div class="card">
+      <div class="card-title">
+        ⚙️ Configure - <span id="envProjectName" style="font-family:var(--mono);font-size:13px;color:var(--muted)"></span>
+      </div>
+
+      <!-- Status bar -->
+      <div class="status-bar" id="statusBar">
+        <div class="status-indicator" id="statusIndicator">
+          <div class="spinner-sm"></div><span>Checking status…</span>
+        </div>
+        <div class="status-actions">
+          <button class="btn btn-secondary" id="stopBtn"   onclick="stopProject()"   style="display:none">⏹ Stop</button>
+          <button class="btn btn-secondary" id="startBtn"  onclick="startProject()"  style="display:none">▶ Start</button>
+          <button class="btn btn-danger"    id="removeBtn" onclick="confirmRemove()">🗑 Remove</button>
+        </div>
+      </div>
+
+      <!-- Env editor -->
+      <div class="env-header">
+        <span>Key</span><span>Value</span><span></span>
+      </div>
+      <div class="env-grid" id="envGrid"></div>
+      <button class="add-var-btn" onclick="addEnvRow('','')">+ Add variable</button>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="goHome()">← Back</button>
+        <div class="spacer"></div>
+        <button class="btn btn-primary" id="deployBtn" onclick="saveAndDeploy()">Save &amp; Deploy →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── View 3: Deploy log ── -->
+  <div class="view" id="view-deploy">
+    <div id="deployAlert" style="display:none"></div>
+    <div id="deployingRow" class="deploying-row">
+      <div class="spinner"></div><span id="deployingMsg">Working… keep this tab open or watch for an ntfy notification.</span>
+    </div>
+    <div class="terminal" id="logOutput"></div>
+    <div class="btn-row" id="postDeployBtns" style="display:none">
+      <button class="btn btn-secondary" onclick="goHome()">← Home</button>
+      <button class="btn btn-secondary" onclick="backToConfigure()">← Configure</button>
+      <div class="spacer"></div>
+      <button class="btn btn-primary"   onclick="rerunDeploy()">↺ Re-deploy</button>
+    </div>
+  </div>
+</main>
+
+<!-- Confirm modal -->
+<div class="modal-backdrop" id="confirmModal" style="display:none">
+  <div class="modal">
+    <h3 id="confirmTitle">Remove project?</h3>
+    <p id="confirmBody">This will stop the containers and permanently delete all project files.</p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+      <div class="spacer"></div>
+      <button class="btn btn-danger" id="confirmOkBtn">Remove</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentProject = null;
+  let lastSseEndpoint = null; // so re-deploy knows which endpoint to use
+
+  // ── Views ────────────────────────────────────────────────────────────────────
+
+  function showView(id, stepNum) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.step').forEach(s => {
+      const n = parseInt(s.dataset.step, 10);
+      s.classList.remove('active', 'done');
+      if (n < stepNum) s.classList.add('done');
+      else if (n === stepNum) s.classList.add('active');
+    });
+  }
+
+  function goHome() {
+    currentProject = null;
+    showView('view-upload', 1);
+    loadProjects();
+  }
+
+  function backToConfigure() {
+    if (currentProject) openProject(currentProject);
+  }
+
+  // ── Projects ─────────────────────────────────────────────────────────────────
+
+  async function loadProjects() {
+    const list  = document.getElementById('projectList');
+    const empty = document.getElementById('projectsEmpty');
+    try {
+      const projects = await api('/api/projects');
+      list.innerHTML = '';
+      if (!projects.length) {
+        empty.textContent = 'No projects yet - upload your first artifact above.';
+        list.appendChild(empty);
+        return;
+      }
+      for (const p of projects) {
+        const item = document.createElement('div');
+        item.className = 'project-item';
+        item.innerHTML = `
+          <span class="project-name">${esc(p.name)}</span>
+          <span class="badge ${p.hasEnv ? 'badge-blue' : 'badge-warn'}">${p.hasEnv ? 'configured' : 'needs setup'}</span>
+        `;
+        item.onclick = () => openProject(p.name);
+        list.appendChild(item);
+      }
+    } catch {
+      empty.textContent = 'Failed to load projects.';
+      list.appendChild(empty);
+    }
+  }
+
+  // ── Upload ───────────────────────────────────────────────────────────────────
+
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput  = document.getElementById('fileInput');
+
+  uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', e => {
+    e.preventDefault(); uploadZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => { if (fileInput.files[0]) uploadFile(fileInput.files[0]); });
+
+  async function uploadFile(file) {
+    if (!file.name.endsWith('.zip')) return alert('Please select a .zip file.');
+    const wrap   = document.getElementById('uploadProgressWrap');
+    const bar    = document.getElementById('uploadBar');
+    const status = document.getElementById('uploadStatus');
+    wrap.style.display = 'block';
+    status.textContent = 'Uploading…';
+    bar.style.width = '10%';
+    bar.style.background = 'var(--blue)';
+    const formData = new FormData();
+    formData.append('artifact', file);
+    try {
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/upload');
+        xhr.upload.onprogress = e => {
+          if (e.lengthComputable) bar.style.width = Math.round((e.loaded / e.total) * 80) + '%';
+        };
+        xhr.onload = () => {
+          bar.style.width = '100%';
+          const data = JSON.parse(xhr.responseText);
+          xhr.status !== 200 ? reject(new Error(data.error || 'Upload failed')) : resolve(data);
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(formData);
+      });
+      status.textContent = `✅ ${result.projectName}`;
+      setTimeout(() => {
+        wrap.style.display = 'none'; bar.style.width = '0%'; fileInput.value = '';
+        openEnvEditor(result.projectName, result.vars);
+      }, 500);
+    } catch (err) {
+      status.textContent = `❌ ${err.message}`;
+      bar.style.width = '0%'; bar.style.background = 'var(--danger)';
+    }
+  }
+
+  // ── Configure ────────────────────────────────────────────────────────────────
+
+  async function openProject(projectName) {
+    const { vars } = await api(`/api/projects/${projectName}/env`);
+    openEnvEditor(projectName, vars);
+  }
+
+  function openEnvEditor(projectName, vars) {
+    currentProject = projectName;
+    document.getElementById('envProjectName').textContent = projectName;
+
+    // Reset deploy button state (bug fix)
+    const btn = document.getElementById('deployBtn');
+    btn.disabled = false;
+    btn.textContent = 'Save & Deploy →';
+
+    // Reset status bar
+    setStatus(null);
+
+    // Populate env grid
+    const grid = document.getElementById('envGrid');
+    grid.innerHTML = '';
+    const entries = Object.entries(vars);
+    if (!entries.length) {
+      grid.innerHTML = '<div class="env-empty">No .env.example found - deploy directly or add variables below.</div>';
+    } else {
+      entries.forEach(([k, v]) => addEnvRow(k, v));
+    }
+
+    showView('view-env', 2);
+    checkStatus(projectName);
+  }
+
+  async function checkStatus(projectName) {
+    try {
+      const { running } = await api(`/api/projects/${projectName}/status`);
+      setStatus(running);
+    } catch {
+      setStatus(false);
+    }
+  }
+
+  function setStatus(running) {
+    const indicator = document.getElementById('statusIndicator');
+    const stopBtn   = document.getElementById('stopBtn');
+    const startBtn  = document.getElementById('startBtn');
+
+    if (running === null) {
+      indicator.innerHTML = '<div class="spinner-sm"></div><span>Checking status…</span>';
+      stopBtn.style.display  = 'none';
+      startBtn.style.display = 'none';
+      return;
+    }
+
+    if (running) {
+      indicator.innerHTML = '<div class="status-dot running"></div><span style="color:var(--success)">Running</span>';
+      stopBtn.style.display  = 'inline-flex';
+      startBtn.style.display = 'none';
+    } else {
+      indicator.innerHTML = '<div class="status-dot stopped"></div><span style="color:var(--muted)">Stopped</span>';
+      stopBtn.style.display  = 'none';
+      startBtn.style.display = 'inline-flex';
+    }
+  }
+
+  // ── Env rows ─────────────────────────────────────────────────────────────────
+
+  function addEnvRow(key = '', value = '') {
+    const grid = document.getElementById('envGrid');
+    const empty = grid.querySelector('.env-empty');
+    if (empty) empty.remove();
+    const row = document.createElement('div');
+    row.className = 'env-row';
+    row.innerHTML = `
+      <input class="env-key-input" type="text" placeholder="VARIABLE_NAME" value="${esc(key)}">
+      <input class="env-val-input" type="text" placeholder="value"         value="${esc(value)}">
+      <button class="env-delete-btn" title="Remove" onclick="removeEnvRow(this)">×</button>
+    `;
+    grid.appendChild(row);
+    if (!key) row.querySelector('.env-key-input').focus();
+  }
+
+  function removeEnvRow(btn) {
+    btn.closest('.env-row').remove();
+    const grid = document.getElementById('envGrid');
+    if (!grid.querySelector('.env-row'))
+      grid.innerHTML = '<div class="env-empty">No variables configured.</div>';
+  }
+
+  function getEnvValues() {
+    const vars = {};
+    document.querySelectorAll('#envGrid .env-row').forEach(row => {
+      const key = row.querySelector('.env-key-input').value.trim();
+      const val = row.querySelector('.env-val-input').value;
+      if (key) vars[key] = val;
+    });
+    return vars;
+  }
+
+  // ── Stop / Start ─────────────────────────────────────────────────────────────
+
+  async function stopProject() {
+    const btn = document.getElementById('stopBtn');
+    btn.disabled = true; btn.textContent = '⏹ Stopping…';
+    try {
+      await api(`/api/projects/${currentProject}/stop`, { method: 'POST' });
+      setStatus(false);
+    } catch (err) {
+      alert('Stop failed: ' + err.message);
+      setStatus(true);
+    }
+    btn.disabled = false; btn.textContent = '⏹ Stop';
+  }
+
+  function startProject() {
+    // Start (no rebuild) via the deploy log view
+    lastSseEndpoint = `/api/start/${currentProject}`;
+    openDeployLog('▶️  Starting', lastSseEndpoint);
+  }
+
+  // ── Deploy ────────────────────────────────────────────────────────────────────
+
+  async function saveAndDeploy() {
+    if (!currentProject) return;
+    const btn = document.getElementById('deployBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      await api(`/api/projects/${currentProject}/env`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vars: getEnvValues() })
+      });
+      lastSseEndpoint = `/api/deploy/${currentProject}`;
+      openDeployLog('🚀  Deploying', lastSseEndpoint);
+    } catch (err) {
+      alert('Failed to save env vars: ' + err.message);
+      btn.disabled = false; btn.textContent = 'Save & Deploy →';
+    }
+  }
+
+  function rerunDeploy() {
+    if (lastSseEndpoint) openDeployLog('↺  Re-running', lastSseEndpoint);
+  }
+
+  function openDeployLog(label, endpoint) {
+    const log       = document.getElementById('logOutput');
+    const alert_    = document.getElementById('deployAlert');
+    const indicator = document.getElementById('deployingRow');
+    const msg       = document.getElementById('deployingMsg');
+    const postBtns  = document.getElementById('postDeployBtns');
+
+    log.textContent = '';
+    alert_.style.display = 'none';
+    indicator.style.display = 'flex';
+    msg.textContent = `${label.replace(/[🚀▶️↺🏗️]/g,'').trim()}… keep this tab open or watch for an ntfy notification.`;
+    postBtns.style.display = 'none';
+
+    showView('view-deploy', 3);
+
+    const es = new EventSource(endpoint);
+
+    es.onmessage = (e) => {
+      const { type, data } = JSON.parse(e.data);
+      if (type === 'log') { log.textContent += data; log.scrollTop = log.scrollHeight; }
+      if (type === 'done') {
+        es.close();
+        indicator.style.display = 'none';
+        postBtns.style.display = 'flex';
+        alert_.className = `alert ${data.success ? 'success' : 'failure'}`;
+        alert_.textContent = data.success ? '✅ Completed successfully' : `❌ Failed (exit ${data.code}) - see logs below`;
+        alert_.style.display = 'flex';
+      }
+    };
+
+    es.onerror = () => {
+      es.close();
+      indicator.style.display = 'none';
+      postBtns.style.display = 'flex';
+      alert_.className = 'alert info';
+      alert_.textContent = '⚠️ Connection lost - operation may still be running. Check ntfy for the result.';
+      alert_.style.display = 'flex';
+    };
+  }
+
+  // ── Remove ────────────────────────────────────────────────────────────────────
+
+  function confirmRemove() {
+    document.getElementById('confirmTitle').textContent = `Remove "${currentProject}"?`;
+    document.getElementById('confirmBody').textContent  =
+      'This will stop all containers and permanently delete all project files. This cannot be undone.';
+    document.getElementById('confirmOkBtn').onclick = doRemove;
+    document.getElementById('confirmModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('confirmModal').style.display = 'none';
+  }
+
+  async function doRemove() {
+    closeModal();
+    const btn = document.getElementById('removeBtn');
+    btn.disabled = true; btn.textContent = '🗑 Removing…';
+    try {
+      await api(`/api/projects/${currentProject}`, { method: 'DELETE' });
+      goHome();
+    } catch (err) {
+      alert('Remove failed: ' + err.message);
+      btn.disabled = false; btn.textContent = '🗑 Remove';
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+
+  async function api(url, opts = {}) {
+    const res = await fetch(url, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || res.statusText);
+    }
+    return res.json();
+  }
+
+  function esc(str) {
+    return String(str ?? '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+  loadProjects();
+</script>
+</body>
+</html>

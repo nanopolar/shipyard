@@ -1,0 +1,17 @@
+services:
+  shipyard-agent:
+    build: .
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      # Give the agent access to the host Docker daemon
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount deployments dir at the SAME path inside and outside the container.
+      # This is important: when the agent runs `docker compose up` for your artifacts,
+      # the host Docker daemon resolves volume paths from the compose file relative to
+      # the project directory. That path must exist on the HOST at the same location.
+      # Set DEPLOYMENTS_DIR in your .env to an absolute path (e.g. /opt/shipyard-agent/deployments).
+      - ${DEPLOYMENTS_DIR:-/opt/shipyard-agent/deployments}:${DEPLOYMENTS_DIR:-/opt/shipyard-agent/deployments}
+    env_file:
+      - .env
+    restart: unless-stopped
